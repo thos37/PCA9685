@@ -29,7 +29,7 @@ prog_uint16_t CIEL12[] PROGMEM = { 0, 2, 4, 5, 7, 9, 11, 12, 14, 16, 18, 20, 21,
   3320, 3356, 3393, 3430, 3467, 3504, 3542, 3579, 3617, 3656, 3694, 3733, 3773, 3812, 3852, 3892,
   3932, 3973, 4013, 4055, 4095 };
 
-PCA9685::PCA9685(byte address)
+PCA9685::PCA9685(uint8_t address)
 {
   _address = address;
 }
@@ -49,7 +49,7 @@ void PCA9685::begin()
 void PCA9685::wake()
 {
   Wire.beginTransmission(_address);
-  Wire.write((byte)0x00);
+  Wire.write((uint8_t)0x00);
   Wire.write(0B00100001);
   Wire.endTransmission();
 }
@@ -69,7 +69,7 @@ void PCA9685::setPWMFrequency(uint16_t freq)
 void PCA9685::PWMPreScale(uint8_t prescale)
 {
   Wire.beginTransmission(_address);
-  Wire.write((byte)0xFE);
+  Wire.write((uint8_t)0xFE);
   Wire.write(prescale);
   Wire.endTransmission();
 }
@@ -81,14 +81,14 @@ uint16_t PCA9685::getPWMFrequency()
 {
   uint8_t prescale;
   Wire.beginTransmission(_address);
-  Wire.write((byte)0xFE);
+  Wire.write((uint8_t)0xFE);
   Wire.endTransmission();
   Wire.requestFrom(_address,(uint8_t)1);
   if(Wire.available()){
     prescale = Wire.read();
   }
   
-  return round((float)((prescale + 1) * (long)4096) / (float)25000000);
+  return round((float)25000000 / (float)(((long)prescale + 1) * (long)4096));
 }
 
 /*
@@ -99,7 +99,7 @@ void PCA9685::PWM(uint8_t start, uint8_t numch, uint16_t* values)
 {
   Wire.beginTransmission(_address);
   byte startcmd = start*4+6;
-  Wire.write((byte)startcmd);				// start from channel 0 ON
+  Wire.write((uint8_t)startcmd);				// start from channel 0 ON
   for (int ch=0;ch<numch;ch++ )
   {
     Wire.write((uint8_t)0x00);				// set all ON time to 0
@@ -110,6 +110,8 @@ void PCA9685::PWM(uint8_t start, uint8_t numch, uint16_t* values)
   Wire.endTransmission();
 }
 
+/* Set multiple channels to the same 12bit value 
+*/
 void PCA9685::PWMSame(uint8_t start, uint8_t numch, uint16_t value)
 {
   uint16_t newvals [numch];
@@ -130,6 +132,8 @@ void PCA9685::PWM(uint8_t channel, uint16_t value)
   PWM(channel, 1, &value);
 }
 
+/* Auto-increment set multiple channels at once with an array of 12bit values 
+*/
 void PCA9685::PWM8(uint8_t start, uint8_t numch, uint8_t* values)
 {
   uint16_t newvals [numch];
@@ -142,6 +146,8 @@ void PCA9685::PWM8(uint8_t start, uint8_t numch, uint8_t* values)
   PWM(start, numch, newvals);
 }
 
+/* Set multiple channels to the same 8bit value 
+*/
 void PCA9685::PWM8Same(uint8_t start, uint8_t numch, uint8_t value)
 {
   PWMSame(start, numch, CIELPWM(value));
@@ -154,8 +160,6 @@ void PCA9685::PWM8(uint8_t channel, uint8_t value)
 {
   PWM(channel, CIELPWM(value));
 }
-
-
 
 /**
  * Get the current 12 bit PWM value
