@@ -1,3 +1,5 @@
+This fork updates the code to work with Arduino v1.0 - Thos37
+
 This library will eventually support all the features of the PCA9685 chip.
 
 This started from and is 99% from pulling out the abilities written by neuroelec from his  HPRGB2 shield library here http://neuroelec.googlecode.com/svn/trunk/libraries/Arduino%201.0/HP_RGB_LED_Shield_V2/HPRGB2/
