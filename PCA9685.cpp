@@ -2,10 +2,10 @@
  * PCA9685.cpp - Arduino library to control PCA9685 chip.
  */
 #include "Arduino.h"
-#include <I2C.h>
+#include <Wire.h>
 #include "PCA9685.h"
 
-extern I2C I2c;
+//extern Wire wire;
 
 #define CIELPWM(a) (pgm_read_word_near(CIEL12 + a)) // CIE Lightness lookup table function
 /**
@@ -39,7 +39,7 @@ PCA9685::PCA9685(byte address)
  */
 void PCA9685::begin()
 {
-  I2c.begin();
+  Wire.begin();
   wake();
 }
 
@@ -48,7 +48,10 @@ void PCA9685::begin()
  */
 void PCA9685::wake()
 {
-  I2c.write(_address, (byte) 0x00, (byte) 0B00100001);
+  Wire.beginTransmission(_address);
+  Wire.write((byte)0x00);
+  Wire.write(0B00100001);
+  Wire.endTransmission();
 }
 
 /**
@@ -61,59 +64,98 @@ void PCA9685::setPWMFrequency(uint16_t freq)
 }
 
 /**
+ * PCA9685 PWM frequency prescale
+ */
+void PCA9685::PWMPreScale(uint8_t prescale)
+{
+  Wire.beginTransmission(_address);
+  Wire.write((byte)0xFE);
+  Wire.write(prescale);
+  Wire.endTransmission();
+}
+
+/**
  * Get PWM Frequency
  */
 uint16_t PCA9685::getPWMFrequency()
 {
-  uint16_t freq;
-  I2c.read(_address, (byte) 0xFE, (uint8_t) 1);
-  while (I2c.available()) {
-    freq = I2c.receive();
+  uint8_t prescale;
+  Wire.beginTransmission(_address);
+  Wire.write((byte)0xFE);
+  Wire.endTransmission();
+  Wire.requestFrom(_address,(uint8_t)1);
+  if(Wire.available()){
+    prescale = Wire.read();
   }
-  return freq;
+  
+  return round((float)((prescale + 1) * (long)4096) / (float)25000000);
 }
 
-void PCA9685::PWM(uint8_t startChannel, uint8_t endChannel, uint16_t value)
+/*
+Send PWM only OFF to channel, PWM start at 0. auto-incremental.
+40% faster than single write and channel changes together.
+*/
+void PCA9685::PWM(uint8_t start, uint8_t numch, uint16_t* values)
 {
-  PWM12(startChannel, endChannel, CIELPWM(value));
-}
-
-/**
- * Single channel 8bit PWM only.  Slow in loop
- */
-void PCA9685::PWM(uint8_t channel, uint16_t value)
-{
-  PWM12(channel, CIELPWM(value));
-}
-
-void PCA9685::PWM12(uint8_t startChannel, uint8_t endChannel, uint16_t value)
-{
-  uint8_t start = (startChannel * 4) + 6;
-  int range = ((endChannel + 1) - startChannel) * 4;
-
-  uint8_t values[range];
-  memset(values, 0, range);
-
-  int stackptr = 2;
-  while(startChannel <= endChannel) {
-    values[stackptr++] = lowByte(value);
-    values[stackptr++] = highByte(value);
-    stackptr += 2;
-    startChannel++;
+  Wire.beginTransmission(_address);
+  byte startcmd = start*4+6;
+  Wire.write((byte)startcmd);				// start from channel 0 ON
+  for (int ch=0;ch<numch;ch++ )
+  {
+    Wire.write((uint8_t)0x00);				// set all ON time to 0
+    Wire.write((uint8_t)0x00);
+    Wire.write(lowByte(values[ch]));	// set OFF according to value
+    Wire.write(highByte(values[ch]));
   }
+  Wire.endTransmission();
+}
 
-  I2c.write(_address, start, values, range);
+void PCA9685::PWMSame(uint8_t start, uint8_t numch, uint16_t value)
+{
+  uint16_t newvals [numch];
+  memset(newvals,0,numch*2);
+  
+  for(int ch = 0; ch < numch; ch++) {
+  	newvals[ch] = value;
+  }
+  
+  PWM(start, numch, newvals);
 }
 
 /**
  * Single channel 12bit PWM only.  Slow in loop
  */
-void PCA9685::PWM12(uint8_t channel, uint16_t value)
+void PCA9685::PWM(uint8_t channel, uint16_t value)
 {
-  uint8_t values[2] = { lowByte(value), highByte(value) };
-  channel = (channel * 4) + 8;
-  I2c.write(_address, channel, values, 2);
+  PWM(channel, 1, &value);
 }
+
+void PCA9685::PWM8(uint8_t start, uint8_t numch, uint8_t* values)
+{
+  uint16_t newvals [numch];
+  memset(newvals,0,numch*2);
+  
+  for(int ch = 0; ch < numch; ch++) {
+  	newvals[ch] = CIELPWM(values[ch]);
+  }
+  
+  PWM(start, numch, newvals);
+}
+
+void PCA9685::PWM8Same(uint8_t start, uint8_t numch, uint8_t value)
+{
+  PWMSame(start, numch, CIELPWM(value));
+}
+
+/**
+ * Single channel 8bit PWM only.  Slow in loop
+ */
+void PCA9685::PWM8(uint8_t channel, uint8_t value)
+{
+  PWM(channel, CIELPWM(value));
+}
+
+
 
 /**
  * Get the current 12 bit PWM value
@@ -122,21 +164,17 @@ uint16_t PCA9685::getPWM(uint8_t channel)
 {
   uint8_t onLow, onHi, offLow, offHi;
   channel = (channel * 4) + 6;
-  I2c.read(_address, channel, (uint8_t) 4);
-  while (I2c.available()) {
-    onLow = I2c.receive();
-    onHi = I2c.receive();
-    offLow = I2c.receive();
-    offHi = I2c.receive();
+  Wire.beginTransmission(_address);
+  Wire.write(channel);
+  Wire.endTransmission();
+  Wire.requestFrom(_address,(uint8_t)4);
+  if(Wire.available()){
+    onLow = Wire.read();
+    onHi = Wire.read();
+    offLow = Wire.read();
+    offHi = Wire.read();
   }
-
   return (word((offHi & 0B00001111), offLow) - word((onHi & 0B00001111), onLow));
 }
 
-/**
- * PCA9685 PWM frequency prescale
- */
-void PCA9685::PWMPreScale(uint8_t prescale)
-{
-  I2c.write(_address, (byte) 0xFE, prescale);
-}
+

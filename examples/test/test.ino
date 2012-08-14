@@ -1,17 +1,19 @@
-#include <I2C.h>
+#include <Wire.h>
 #include <PCA9685.h>
-PCA9685 whiteDrv(0x43);
+
+PCA9685 ledDrive(0x41);
 
 void setup()
 {
-  whiteDrv.begin();
+  ledDrive.begin();
   Serial.begin(9600);
 
-  whiteDrv.setPWMFrequency(200);
-  Serial.println(whiteDrv.getPWMFrequency());
+  ledDrive.setPWMFrequency(200);
+  Serial.print("PWM Frequency: ");
+  Serial.println(ledDrive.getPWMFrequency());
 
-  //turn everything off
-  whiteDrv.PWM(0, 15, 0);  
+  //turn everything off  
+  ledDrive.PWMSame(0, 15, 0);  
 }
 
 void loop()
@@ -23,7 +25,7 @@ void loop()
   while (i < 6) {
     j = 0;
     while (j <= 255) {
-      whiteDrv.PWM(i, j);
+      ledDrive.PWM(i, j);
       j++;
     }
     i++;
@@ -32,31 +34,31 @@ void loop()
   while (i >= 0) {
     j = 255;
     while (j >= 0) {
-      whiteDrv.PWM(i, j);
+      ledDrive.PWM(i, j);
       j--;
     }
     i--;
   }
   
-  Serial.println(whiteDrv.getPWM(0));
+  Serial.println(ledDrive.getPWM(0));
 
   delay(500);
 
   while (k <= 255) {
-    whiteDrv.PWM(0, 5, k);
+    ledDrive.PWM(0, k);
     k++;
   }
   
-  Serial.println(whiteDrv.getPWM(0));
+  Serial.println(ledDrive.getPWM(0));
 
   delay(1000);
   
   while (k >= 0) {
-    whiteDrv.PWM(0, 5, k);
+    ledDrive.PWM(0, k);
     k--;
   }
   
-  Serial.println(whiteDrv.getPWM(0));
+  Serial.println(ledDrive.getPWM(0));
 
   delay(500);
 }
